@@ -7,7 +7,7 @@ android {
     buildToolsVersion "30.0.2"
 
     defaultConfig {
-        applicationId "com.example.madlevel5task1"
+        applicationId "com.example.madlevel5example"
         minSdkVersion 23
         targetSdkVersion 30
         versionCode 1
