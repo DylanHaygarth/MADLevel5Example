@@ -1,30 +1,26 @@
 package com.example.madlevel5example.ui
 
 import android.os.Bundle
-import android.util.Log
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.fragment.app.setFragmentResultListener
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.Observer
+import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.madlevel5example.R
 import com.example.madlevel5example.model.Reminder
-import com.example.madlevel5example.repository.ReminderRepository
 import kotlinx.android.synthetic.main.fragment_reminders.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.util.*
 
 class RemindersFragment : Fragment() {
-    private lateinit var reminderRepository: ReminderRepository
     private val reminders = arrayListOf<Reminder>()
-    private val reminderAdapter =
-        ReminderAdapter(reminders)
+    private val reminderAdapter = ReminderAdapter(reminders)
+
+    private val viewModel: ReminderViewModel by viewModels()
 
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?,
@@ -39,13 +35,6 @@ class RemindersFragment : Fragment() {
 
         initViews()
         observeAddReminderResult()
-
-        // the reminder repository is given the correct context
-        reminderRepository =
-            ReminderRepository(
-                requireContext()
-            )
-        getRemindersFromDatabase()
     }
 
     private fun initViews() {
@@ -58,21 +47,14 @@ class RemindersFragment : Fragment() {
         createItemTouchHelper().attachToRecyclerView(rvReminders)
     }
 
+    // observes the live data from the view model. Whenever the live data changes, the recycler view is updated
     private fun observeAddReminderResult() {
-        setFragmentResultListener(REQ_REMINDER_KEY) { key, bundle ->
-            bundle.getString(BUNDLE_REMINDER_KEY)?.let {
-                val reminder = Reminder(it)
-
-                // adds a reminder to the database
-                CoroutineScope(Dispatchers.Main).launch {
-                    withContext(Dispatchers.IO) {
-                        reminderRepository.insertReminder(reminder)
-                    }
-                    getRemindersFromDatabase()
-                }
-
-            } ?: Log.e("ReminderFragment", "Request triggered, but empty reminder text!")
-        }
+        viewModel.reminders.observe(viewLifecycleOwner, Observer {
+                reminders ->
+            this@RemindersFragment.reminders.clear()
+            this@RemindersFragment.reminders.addAll(reminders)
+            reminderAdapter.notifyDataSetChanged()
+        })
     }
 
     private fun createItemTouchHelper(): ItemTouchHelper {
@@ -93,27 +75,11 @@ class RemindersFragment : Fragment() {
                 val reminderToDelete = reminders[position]
 
                 // deletes a reminder at given position
-                CoroutineScope(Dispatchers.Main).launch {
-                    withContext(Dispatchers.IO) {
-                        reminderRepository.deleteReminder(reminderToDelete)
-                    }
-                    getRemindersFromDatabase()
-                }
+                viewModel.deleteReminder(reminderToDelete)
             }
         }
         return ItemTouchHelper(callback)
     }
-
-    // retrieves the reminders from the database. Clears all reminders currently in there and replaces with retrieved ones.
-    private fun getRemindersFromDatabase() {
-        CoroutineScope(Dispatchers.Main).launch {
-            val reminders = withContext(Dispatchers.IO) {
-                reminderRepository.getAllReminders()
-            }
-            this@RemindersFragment.reminders.clear()
-            this@RemindersFragment.reminders.addAll(reminders)
-            reminderAdapter.notifyDataSetChanged()
-        }
-    }
-
 }
+
+
